@@ -227,50 +227,72 @@ namespace esphome {
 
 
 		void ValloxVentilation::retryVariables() {
-			bool retryStatus  = 0;
-			bool retry08      = 0;
-			bool retryProgram = 0;
-			if (this->fan_speed_sensor_            != nullptr) { if (!this->fan_speed_sensor_->has_state())          { requestVariable(VX_VARIABLE_FAN_SPEED        ); }}
-			if (this->fan_speed_default_sensor_    != nullptr) { if (!this->fan_speed_default_sensor_->has_state())  { requestVariable(VX_VARIABLE_FAN_SPEED_MIN    ); }}
-			if (this->service_period_sensor_       != nullptr) { if (!this->service_period_sensor_->has_state())     { requestVariable(VX_VARIABLE_SERVICE_PERIOD   ); }}
-			if (this->service_remaining_sensor_    != nullptr) { if (!this->service_remaining_sensor_->has_state())  { requestVariable(VX_VARIABLE_SERVICE_REMAINING); }}
-			if (this->temperature_target_sensor_   != nullptr) { if (!this->temperature_target_sensor_->has_state()) { requestVariable(VX_VARIABLE_HEATING_TARGET   ); }}
 
-			if (this->temperature_outside_sensor_  != nullptr) { if (!this->temperature_outside_sensor_->has_state())  { requestVariable(VX_VARIABLE_T_OUTSIDE ); }}
-			if (this->temperature_inside_sensor_   != nullptr) { if (!this->temperature_inside_sensor_->has_state())   { requestVariable(VX_VARIABLE_T_INSIDE  ); }}
-			if (this->temperature_outgoing_sensor_ != nullptr) { if (!this->temperature_outgoing_sensor_->has_state()) { requestVariable(VX_VARIABLE_T_OUTGOING); }}
-			if (this->temperature_incoming_sensor_ != nullptr) { if (!this->temperature_incoming_sensor_->has_state()) { requestVariable(VX_VARIABLE_T_INCOMING); }}
-
-			if (this->status_on_binary_sensor_      != nullptr) { if (!this->status_on_binary_sensor_->has_state())      { retryStatus = 1; }}
-			if (this->service_needed_binary_sensor_ != nullptr) { if (!this->service_needed_binary_sensor_->has_state()) { retryStatus = 1; }}
-			if (this->heating_binary_sensor_        != nullptr) { if (!this->heating_binary_sensor_->has_state())        { retryStatus = 1; }}
-			if (this->heating_mode_binary_sensor_   != nullptr) { if (!this->heating_mode_binary_sensor_->has_state())   { retryStatus = 1; }}
-			if (this->problem_binary_sensor_        != nullptr) { if (!this->problem_binary_sensor_->has_state())        { retryStatus = 1; }}
-			if (retryStatus) { requestVariable(VX_VARIABLE_STATUS); }
-
-			if (this->summer_mode_binary_sensor_      != nullptr) { if (!this->summer_mode_binary_sensor_->has_state())      { retry08 = 1; }}
-			if (this->status_motor_in_binary_sensor_  != nullptr) { if (!this->status_motor_in_binary_sensor_->has_state())  { retry08 = 1; }}
-			if (this->status_motor_out_binary_sensor_ != nullptr) { if (!this->status_motor_out_binary_sensor_->has_state()) { retry08 = 1; }}
-			if (this->front_heating_binary_sensor_    != nullptr) { if (!this->front_heating_binary_sensor_->has_state())    { retry08 = 1; }}
-			if (this->error_relay_binary_sensor_      != nullptr) { if (!this->error_relay_binary_sensor_->has_state())      { retry08 = 1; }}
-			if (retry08)     { requestVariable(VX_VARIABLE_IO_08);  }
-
-			if (this->switch_type_text_sensor_     != nullptr) { if (!this->switch_type_text_sensor_->has_state())     { retryProgram = 1; }}
-			if (this->switch_type_select_select_   != nullptr) { if (!this->switch_type_select_select_->has_state())   { retryProgram = 1; }}
-			if (retryProgram) { requestVariable(VX_VARIABLE_PROGRAM); }
-
-			if (this->switch_active_binary_sensor_ != nullptr) { if (!this->switch_active_binary_sensor_->has_state()) { requestVariable(VX_VARIABLE_FLAGS_06); }}
-
+			bool retrySlow = 0;
+			bool retryFlag = 0;
+			
+			iofastqueryts = ionow;
+			if ((ionow - ioslowqueryts) > SLOW_QUERY_INTERVAL) { retrySlow = 1; ioslowqueryts = ionow;}
+			
+			// 0x08 // fast query
+			retryFlag = 0;
+			if (this->summer_mode_binary_sensor_      != nullptr) { retryFlag = 1; }
+			if (this->status_motor_in_binary_sensor_  != nullptr) { retryFlag = 1; }
+			if (this->status_motor_out_binary_sensor_ != nullptr) { retryFlag = 1; }
+			if (this->front_heating_binary_sensor_    != nullptr) { retryFlag = 1; }
+			if (this->error_relay_binary_sensor_      != nullptr) { retryFlag = 1; }
+			if (retryFlag)     { requestVariable(VX_VARIABLE_IO_08);  }
+			// 0x29 // fast query // required by climate sensor
+			requestVariable(VX_VARIABLE_FAN_SPEED); 
+			// 0x2B // 0x2C // no query needed, broadcast by mainboard
+			// if (this->co2_sensor_ != nullptr) { if (!this->co2_sensor_->has_state())                 { requestVariable(VX_VARIABLE_CO2_LO); requestVariable(VX_VARIABLE_CO2_HI); }}
+			// 0x2F // fast
+			if (this->humidity_1_sensor_ != nullptr) { requestVariable(VX_VARIABLE_RH1); }
+			// 0x30 // fast
+			if (this->humidity_2_sensor_ != nullptr) { requestVariable(VX_VARIABLE_RH2); }
+			// 0x32
+			if (this->temperature_outside_sensor_  != nullptr) { if ((!this->temperature_outside_sensor_->has_state())  || retrySlow ) { requestVariable(VX_VARIABLE_T_OUTSIDE ); }}
+			// 0x33
+			if (this->temperature_outgoing_sensor_ != nullptr) { if ((!this->temperature_outgoing_sensor_->has_state()) || retrySlow ) { requestVariable(VX_VARIABLE_T_OUTGOING); }}
+			// 0x34 // slow query // required by climate sensor
+			if (!buffer.contains(VX_VARIABLE_T_INSIDE) || retrySlow ) { requestVariable(VX_VARIABLE_T_INSIDE); }
+			// 0x35
+			if (this->temperature_incoming_sensor_ != nullptr) { if ((!this->temperature_incoming_sensor_->has_state()) || retrySlow ) { requestVariable(VX_VARIABLE_T_INCOMING); }}
+			// 0x36
 			// do not request variable, mainboard will not answer (without fault? Does it get pushed?)
 			// if (this->fault_condition_text_sensor_ != nullptr) { if (!this->fault_condition_text_sensor_->has_state()) { requestVariable(VX_VARIABLE_FAULT_CODE); }}
-
-			if (this->heat_bypass_number_          != nullptr) { if (!this->heat_bypass_number_->has_state())          { requestVariable(VX_VARIABLE_T_HEAT_BYPASS); }}
-			if (this->fan_speed_max_number_        != nullptr) { if (!this->fan_speed_max_number_->has_state())        { requestVariable(VX_VARIABLE_FAN_SPEED_MAX); }}
-			if (this->fan_speed_min_number_        != nullptr) { if (!this->fan_speed_min_number_->has_state())        { requestVariable(VX_VARIABLE_FAN_SPEED_MIN); }}
-
-			if (this->co2_sensor_                  != nullptr) { if (!this->co2_sensor_->has_state())                  { requestVariable(VX_VARIABLE_CO2_LO); requestVariable(VX_VARIABLE_CO2_HI); }}
-			if (this->humidity_1_sensor_           != nullptr) { if (!this->humidity_1_sensor_->has_state())           { requestVariable(VX_VARIABLE_RH1); }}
-			if (this->humidity_2_sensor_           != nullptr) { if (!this->humidity_2_sensor_->has_state())           { requestVariable(VX_VARIABLE_RH2); }}
+			// 0x71 // fast but also query in case only remaining switch time is configured
+			if ((this->switch_active_binary_sensor_ != nullptr) || (this->switch_remaining_sensor_ != nullptr)) { requestVariable(VX_VARIABLE_FLAGS_06); }
+			// 0x79 // fast but only if special function is active
+			if (this->switch_remaining_sensor_ != nullptr) { 
+				if (buffer.contains(VX_VARIABLE_FLAGS_06)) {
+					if ((buffer[VX_VARIABLE_FLAGS_06] & VX_06_FIREPLACE_FLAG_IS_ACTIVE) != 0x00 ) { requestVariable(VX_VARIABLE_SWITCH_REMAINING); }
+				}
+			}
+			// 0xA3 // fast query // requied by climate sensor
+			requestVariable(VX_VARIABLE_STATUS);
+			// 0xA4
+			requestVariable(VX_VARIABLE_HEATING_TARGET);
+			// 0xA5 // slow query
+			if (this->fan_speed_max_number_        != nullptr) { if ((!this->fan_speed_max_number_->has_state()) || retrySlow )       { requestVariable(VX_VARIABLE_FAN_SPEED_MAX); }}
+			// 0xA9 // slow query // if either sensor is configured
+			retryFlag = 0;
+			if (this->fan_speed_min_number_        != nullptr) { if ((!this->fan_speed_min_number_->has_state())     || retrySlow ) { retryFlag = 1; }}
+			if (this->fan_speed_default_sensor_    != nullptr) { if ((!this->fan_speed_default_sensor_->has_state()) || retrySlow ) { retryFlag = 1; }}
+			if (retryFlag)     { requestVariable(VX_VARIABLE_FAN_SPEED_MIN); }
+			// 0xA6 // slow query // required also for service reset
+			if ((this->service_reset_button_ != nullptr) || (this->service_period_sensor_ != nullptr)) {
+				if (!buffer.contains(VX_VARIABLE_SERVICE_PERIOD) || retrySlow ) { requestVariable(VX_VARIABLE_SERVICE_PERIOD   ); }
+			}
+			// 0xAA
+			retryFlag = 0;
+			if (this->switch_type_text_sensor_     != nullptr) { if ((!this->switch_type_text_sensor_->has_state())   || retrySlow ) { retryFlag = 1; }}
+			if (this->switch_type_select_select_   != nullptr) { if ((!this->switch_type_select_select_->has_state()) || retrySlow ) { retryFlag = 1; }}
+			if (retryFlag) { requestVariable(VX_VARIABLE_PROGRAM); }
+			// 0xAB
+			if (this->service_remaining_sensor_    != nullptr) { if ((!this->service_remaining_sensor_->has_state())  || retrySlow ) { requestVariable(VX_VARIABLE_SERVICE_REMAINING); }}
+			// 0xAF
+			if (this->heat_bypass_number_          != nullptr) { if ((!this->heat_bypass_number_->has_state())        || retrySlow ) { requestVariable(VX_VARIABLE_T_HEAT_BYPASS); }}
 		}
 
 
@@ -299,36 +321,8 @@ namespace esphome {
 				}
 			}
 			if ( (ionow - iots) > 10 ) { updateState(); }  // no input/output during last 10ms, update state, either check for retry on send or revert back to RECEIVED_IDLE
-			if ( (ionow - ioretryts) > RETRY_INTERVAL) {     // check if some of the enabled variables are not filled yet, send query again
-				ioretryts = ionow;
+			if ( (ionow - iofastqueryts) > FAST_QUERY_INTERVAL) {     // check if some of the enabled variables are not filled yet, send query again
 				retryVariables();
-			}
-			if ( (ionow - ioslowqueryts) > SLOW_QUERY_INTERVAL) {     // update some variables that typically are not broadcasted and are not time critical or refresh other changes that might have been missed (broadcast from other panel lost)
-				ioslowqueryts = ionow;
-			    if (this->service_remaining_sensor_ != nullptr) { requestVariable(VX_VARIABLE_SERVICE_REMAINING); }
-			    // TODO: add some more stuff (anything not in fast interval below) or do some monitoring on the bus to see how the other remote handles it..
-			}
-			if ( (ionow - iofastqueryts) > FAST_QUERY_INTERVAL) {     // update some variables that should be monitored and are not automatically broadcasted?
-				iofastqueryts = ionow;
-				if ((this->summer_mode_binary_sensor_      != nullptr) ||
-					(this->status_motor_in_binary_sensor_  != nullptr) ||
-					(this->status_motor_out_binary_sensor_ != nullptr) ||
-					(this->front_heating_binary_sensor_    != nullptr) ||
-					(this->error_relay_binary_sensor_      != nullptr) )
-					{ requestVariable(VX_VARIABLE_IO_08); }
-				if ((this->status_on_binary_sensor_      != nullptr) ||
-					(this->service_needed_binary_sensor_ != nullptr) ||
-					(this->heating_binary_sensor_        != nullptr) ||
-					(this->heating_mode_binary_sensor_   != nullptr) ||
-					(this->problem_binary_sensor_        != nullptr) )
-					{ requestVariable(VX_VARIABLE_STATUS); }
-
-				if (this->temperature_target_sensor_   != nullptr) { requestVariable(VX_VARIABLE_HEATING_TARGET); }
-				if (this->switch_active_binary_sensor_ != nullptr) { requestVariable(VX_VARIABLE_FLAGS_06); }
-				if (this->switch_remaining_sensor_ != nullptr) { requestVariable(VX_VARIABLE_SWITCH_REMAINING); }
-				if (this->co2_sensor_ != nullptr) { requestVariable(VX_VARIABLE_CO2_LO); requestVariable(VX_VARIABLE_CO2_HI); }
-				if (this->humidity_1_sensor_ != nullptr) { requestVariable(VX_VARIABLE_RH1); }
-				if (this->humidity_2_sensor_ != nullptr) { requestVariable(VX_VARIABLE_RH2); }
 			}
 		}
 
