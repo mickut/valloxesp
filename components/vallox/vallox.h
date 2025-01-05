@@ -268,6 +268,7 @@ namespace esphome {
 				unsigned char				iomessage_recv[VX_MSG_LENGTH-1]; // Checksum unsigned char not included, validated during receive
 				vector<unsigned char>		iomessage_send;
 				queue<vector<unsigned char>>	iomessage_send_queue;
+				queue<vector<unsigned char>>	iomessage_send_command_queue;
 				unsigned char		iochecksum = 0;
 				uint				iomessage_send_retries = 0;
 

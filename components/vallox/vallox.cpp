@@ -307,20 +307,22 @@ namespace esphome {
 				updateState();
 			} else if (getState() == RECEIVED_IDLE) {  // got time on our hands and are not waiting on something like checksum from previous sent message, check if we have something new to send.
 				if ((ionow - iosendts) > SEND_INTERVAL) {  // non-blocking delay between sending packets
-					if (iomessage_send_queue.size() > 0) {
+					if (iomessage_send_command_queue.size() > 0) {  // send_command_queue only receives packets with required checksum
+						sendMessage(iomessage_send_command_queue.front());
+						iots = ionow;
+						iosendts = ionow;
+						setState(SENT_PACKET_AWAITING_CHECKSUM);
+					} else if (iomessage_send_queue.size() > 0) {
 						sendMessage(iomessage_send_queue.front());
 						iots = ionow;
 						iosendts = ionow;
-						if (iomessage_send_queue.front()[2] == VX_MSG_MAINBOARDS || iomessage_send_queue.front()[2] == VX_MSG_PANELS || iomessage_send_queue.front()[3] == VX_MSG_POLL_BYTE) { // broadcast or variable request, no need to wait for checksum
-							iomessage_send_queue.pop();
-							setState(RECEIVED_IDLE);
-						} else {  // unicast, check for checksum reply
-							setState(SENT_PACKET_AWAITING_CHECKSUM);
-						}
+						// broadcast or variable request, no need to wait for checksum
+						iomessage_send_queue.pop();
+						setState(RECEIVED_IDLE);
 					}
 				}
 			}
-			if ( (ionow - iots) > 10 ) { updateState(); }  // no input/output during last 10ms, update state, either check for retry on send or revert back to RECEIVED_IDLE
+			if ( (ionow - iots) > VX_REPLY_WAIT_TIME ) { updateState(); }  // no input/output during last 10ms, update state, either check for retry on send or revert back to RECEIVED_IDLE
 			if ( (ionow - iofastqueryts) > FAST_QUERY_INTERVAL) {     // check if some of the enabled variables are not filled yet, send query again
 				retryVariables();
 			}
@@ -369,14 +371,17 @@ namespace esphome {
 
 		void ValloxVentilation::updateState() {
 			// Timeout receiving data
-			if ((ionow - iots) > 10) {
+			if ((ionow - iosendts) > VX_REPLY_WAIT_TIME) {
 				if (getState() == SENT_PACKET_AWAITING_CHECKSUM) {
 					if (iomessage_send_retries >= VX_MAX_RETRIES) {
-						if (iomessage_send_queue.size() > 0) { iomessage_send_queue.pop(); }  ////// give up, discard message ///////
-						setState(RECEIVED_IDLE);  ////////// SET ERROR STATUS /////////// 
+						if (iomessage_send_command_queue.size() > 0) { iomessage_send_command_queue.pop(); }  ////// give up, discard message ///////
+						setState(RECEIVED_IDLE);
+						ESP_LOGD(TAG,"failed to receive checksum confirmation on sent command, giving up");
 					} else {
 						iomessage_send_retries++;
-						sendMessage(iomessage_send_queue.front());
+						iosendts = ionow;
+						sendMessage(iomessage_send_command_queue.front());
+						ESP_LOGD(TAG,"failed to receive checksum confirmation on sent command, retrying");
 					}
 				} else if ((ionow - iots) > 100) {
 					setState(RECEIVED_IDLE);  // if during receive state, nothing received for 100ms, go back to IDLE and evaluate below based on fresh packet
@@ -433,12 +438,12 @@ namespace esphome {
 					setState(RECEIVED_IDLE);
 					break;
 				case SENT_PACKET_AWAITING_CHECKSUM:
-					if (iomessage_send_queue.size() > 0) {
-						if (iomessage_recv_byte == iomessage_send_queue.front()[5]) {
+					if (iomessage_send_command_queue.size() > 0) {
+						if (iomessage_recv_byte == iomessage_send_command_queue.front()[5]) {
 							iomessage_send_retries = 0;
-							if (iomessage_send_queue.size() > 0) { iomessage_send_queue.pop(); }
+							if (iomessage_send_command_queue.size() > 0) { iomessage_send_command_queue.pop(); }
 							setState(RECEIVED_IDLE);    // all ok, received checksum, go back to idle
-						}
+						} // received something but not matching checksum, stay in current state and wait for 10ms to expire
 					} else {  // should not happen, just to be safe..
 						setState(RECEIVED_IDLE);
 					}
@@ -465,7 +470,7 @@ namespace esphome {
 
 		void ValloxVentilation::setVariable(unsigned char variable, unsigned char value) { // no target, send to mainboard_1 and all panels.  // maybe check for status variable and only send to mainboard?
 			setVariable(variable, value, VX_MSG_PANELS);
-			setVariable(variable, value, VX_MSG_MAINBOARDS);
+			// setVariable(variable, value, VX_MSG_MAINBOARDS);  // TODO: disable for now. This can be enabled if needed but keep in mind that we would need to ensure that the sending order is maintained (direct commands will get prioritized over broadcasts thus a broadcast of a previous command could arrive after a direct command that was issued later)
 			setVariable(variable, value, VX_MSG_MAINBOARD_1);
 		}
 
@@ -478,7 +483,11 @@ namespace esphome {
 			newmessage[4] = value;
 			newmessage[5] = getChecksum(newmessage);
 
-			if (iomessage_send_queue.size() < SEND_QUEUE_MAX_DEPTH) { iomessage_send_queue.push(newmessage); }
+			if (newmessage[2] == VX_MSG_MAINBOARDS || newmessage[2] == VX_MSG_PANELS) {  // put broadcast messages into the non-ack queue
+				if (iomessage_send_queue.size() < SEND_QUEUE_MAX_DEPTH) { iomessage_send_queue.push(newmessage); }
+			} else {
+				if (iomessage_send_command_queue.size() < SEND_QUEUE_MAX_DEPTH) { iomessage_send_command_queue.push(newmessage); }
+			}
 		}
 
 		void ValloxVentilation::decodeFlags(unsigned char element, unsigned char value) {
