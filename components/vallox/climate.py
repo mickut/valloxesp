@@ -68,6 +68,8 @@ ICON_CALENDAR_ALERT = "mdi:calendar-alert"
 ICON_HEAT_WAVE = "mdi:heat-wave"
 ICON_CALENDAR_REFRESH = "mdi:calendar-refresh"
 ICON_FAN_CLOCK = "mdi:fan-clock"
+ICON_FAN_CHEVRON_UP = "mdi:fan-chevron-up"
+ICON_FAN_CHEVRON_DOWN = "mdi:fan-chevron-down"
 
 vallox_ns = cg.esphome_ns.namespace("vallox")
 ValloxVentilation = vallox_ns.class_("ValloxVentilation", climate.Climate, cg.Component)
@@ -209,10 +211,12 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_FAN_SPEED_MAX): number.number_schema(
               ValloxVentilationFanSpeedMaxNum,
               entity_category=ENTITY_CATEGORY_CONFIG,
+              icon=ICON_FAN_CHEVRON_UP,
             ),
             cv.Optional(CONF_FAN_SPEED_MIN): number.number_schema(
               ValloxVentilationFanSpeedMinNum,
               entity_category=ENTITY_CATEGORY_CONFIG,
+              icon=ICON_FAN_CHEVRON_DOWN,
             ),
             cv.Optional(CONF_SWITCH): button.button_schema(
               ValloxVentilationSwitchBtn,
