@@ -541,28 +541,28 @@ namespace esphome {
 			if (message[2] == VX_MSG_THIS_PANEL || message[2] == VX_MSG_PANELS) {
 				// Temperature
 				if (variable == VX_VARIABLE_T_OUTSIDE)  {
-					// buffer[VX_VARIABLE_T_OUTSIDE] = value;
+					buffer[VX_VARIABLE_T_OUTSIDE] = value;
 					if (this->temperature_outside_sensor_  != nullptr) { this->temperature_outside_sensor_->publish_state(convNtc2Cel(value));  }
 				} else if (variable == VX_VARIABLE_T_OUTGOING) {
-					// buffer[VX_VARIABLE_T_OUTGOING] = value;
+					buffer[VX_VARIABLE_T_OUTGOING] = value;
 					if (this->temperature_outgoing_sensor_ != nullptr) { this->temperature_outgoing_sensor_->publish_state(convNtc2Cel(value)); }
 				} else if (variable == VX_VARIABLE_T_INSIDE)   {
-					// buffer[VX_VARIABLE_T_INSIDE] = value;
+					buffer[VX_VARIABLE_T_INSIDE] = value;
 					if (this->temperature_inside_sensor_   != nullptr) { this->temperature_inside_sensor_->publish_state(convNtc2Cel(value));   }
 					// Inside temperature used for climate current temperature
 					this->current_temperature = convNtc2Cel(value);
 					this->publish_state();
 				} else if (variable == VX_VARIABLE_T_INCOMING) {
-					// buffer[VX_VARIABLE_T_INCOMING] = value;
+					buffer[VX_VARIABLE_T_INCOMING] = value;
 					if (this->temperature_incoming_sensor_ != nullptr) { this->temperature_incoming_sensor_->publish_state(convNtc2Cel(value)); }
 				} else if (variable == VX_VARIABLE_RH1) {  // RH 1
-					// buffer[VX_VARIABLE_RH1] = value;
+					buffer[VX_VARIABLE_RH1] = value;
 					val = convHex2Rh(value);
 					if (val!=NOT_SET) {
 						if (this->humidity_1_sensor_ != nullptr) { this->humidity_1_sensor_->publish_state(val); }
 					}
 				} else if (variable == VX_VARIABLE_RH2) {  // RH 2
-					// buffer[VX_VARIABLE_RH2] = value;
+					buffer[VX_VARIABLE_RH2] = value;
 					val =  convHex2Rh(value);
 					if (val!=NOT_SET) {
 						if (this->humidity_2_sensor_ != nullptr) { this->humidity_2_sensor_->publish_state(val); }
@@ -588,7 +588,7 @@ namespace esphome {
 						}
 					}
 				} else if (variable == VX_VARIABLE_FAN_SPEED) {        // Others (config object)
-					// buffer[VX_VARIABLE_FAN_SPEED] = value;
+					buffer[VX_VARIABLE_FAN_SPEED] = value;
 					val = convHex2FanSpeed(value);
 					if (val!=NOT_SET) {
 						if (this->fan_speed_sensor_ != nullptr) { this->fan_speed_sensor_->publish_state(val); }
@@ -596,7 +596,7 @@ namespace esphome {
 						this->publish_state();
 					}
 				} else if (variable == VX_VARIABLE_FAN_SPEED_MIN) {
-					// buffer[VX_VARIABLE_FAN_SPEED_MIN] = value;
+					buffer[VX_VARIABLE_FAN_SPEED_MIN] = value;
 					val = convHex2FanSpeed(value);
 					if (val!=NOT_SET) {
 						if (this->fan_speed_default_sensor_ != nullptr) { this->fan_speed_default_sensor_->publish_state(val); } // default fan speed is minimum fan speed, maybe this sensor is superfluous
@@ -617,15 +617,15 @@ namespace esphome {
 					val = (float)value;
 					if (this->service_period_sensor_ != nullptr) { this->service_period_sensor_->publish_state(val); }
 				} else if (variable == VX_VARIABLE_SERVICE_REMAINING) {
-					// buffer[VX_VARIABLE_SERVICE_REMAINING] = value;
+					buffer[VX_VARIABLE_SERVICE_REMAINING] = value;
 					val = (float)value;
 					if (this->service_remaining_sensor_ != nullptr) { this->service_remaining_sensor_->publish_state(val); }
 				} else if (variable == VX_VARIABLE_SWITCH_REMAINING) {
-					// buffer[VX_VARIABLE_SWITCH_REMAINING] = value;
+					buffer[VX_VARIABLE_SWITCH_REMAINING] = value;
 					val = (float)value;
 					if (this->switch_remaining_sensor_ != nullptr) { this->switch_remaining_sensor_->publish_state(val); }
 				} else if (variable == VX_VARIABLE_HEATING_TARGET) {
-					// buffer[VX_VARIABLE_HEATING_TARGET] = value;
+					buffer[VX_VARIABLE_HEATING_TARGET] = value;
 					val = convNtc2Cel(value);
 					if (this->temperature_target_sensor_  != nullptr) {
 						this->temperature_target_sensor_->publish_state(val);
@@ -636,10 +636,10 @@ namespace esphome {
 					buffer[VX_VARIABLE_PROGRAM] = value;
 					decodeFlags(VX_VARIABLE_PROGRAM, value);
 				} else if (variable == VX_VARIABLE_T_HEAT_BYPASS) { // Heat Bypass temperature
-					// buffer[VX_VARIABLE_T_HEAT_BYPASS] = value;
+					buffer[VX_VARIABLE_T_HEAT_BYPASS] = value;
 					if (this->heat_bypass_number_ != nullptr) { this->heat_bypass_number_->publish_state(convNtc2Cel(value)); }
 				} else if (variable == VX_VARIABLE_FAULT_CODE) {
-					// buffer[VX_VARIABLE_FAULT_CODE] = value;
+					buffer[VX_VARIABLE_FAULT_CODE] = value;
 					if (this->fault_condition_text_sensor_ != nullptr) {
 						if (value == 0x05) { this->fault_condition_text_sensor_->publish_state("incoming air sensor fault");         }
 						if (value == 0x06) { this->fault_condition_text_sensor_->publish_state("carbon dioxide alarm");              }
@@ -649,7 +649,7 @@ namespace esphome {
 						if (value == 0x0a) { this->fault_condition_text_sensor_->publish_state("outgoing air sensor fault");         }
 					}
 				} else if (variable == VX_VARIABLE_FAN_SPEED_MAX) {
-					// buffer[VX_VARIABLE_FAN_SPEED_MAX] = value;
+					buffer[VX_VARIABLE_FAN_SPEED_MAX] = value;
 					val = convHex2FanSpeed(value);
 					if (val!=NOT_SET) {
 						if (this->fan_speed_max_number_ != nullptr) { this->fan_speed_max_number_->publish_state(val); }
