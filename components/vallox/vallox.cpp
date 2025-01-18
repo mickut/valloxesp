@@ -230,10 +230,10 @@ namespace esphome {
 
 			bool retrySlow = 0;
 			bool retryFlag = 0;
-			
+
 			iofastqueryts = ionow;
 			if ((ionow - ioslowqueryts) > SLOW_QUERY_INTERVAL) { retrySlow = 1; ioslowqueryts = ionow;}
-			
+
 			// 0x08 // fast query
 			retryFlag = 0;
 			if (this->summer_mode_binary_sensor_      != nullptr) { retryFlag = 1; }
@@ -243,7 +243,7 @@ namespace esphome {
 			if (this->error_relay_binary_sensor_      != nullptr) { retryFlag = 1; }
 			if (retryFlag)     { requestVariable(VX_VARIABLE_IO_08);  }
 			// 0x29 // fast query // required by climate sensor
-			requestVariable(VX_VARIABLE_FAN_SPEED); 
+			requestVariable(VX_VARIABLE_FAN_SPEED);
 			// 0x2B // 0x2C // no query needed, broadcast by mainboard
 			// if (this->co2_sensor_ != nullptr) { if (!this->co2_sensor_->has_state())                 { requestVariable(VX_VARIABLE_CO2_LO); requestVariable(VX_VARIABLE_CO2_HI); }}
 			// 0x2F // fast
@@ -304,25 +304,27 @@ namespace esphome {
 			if (this->available() >= 1) {
 				this->read_byte(&iomessage_recv_byte);
 				iots = ionow;
-				updateState();
-			} else if (getState() == RECEIVED_IDLE) {  // got time on our hands and are not waiting on something like checksum from previous sent message, check if we have something new to send.
-				if ((ionow - iosendts) > SEND_INTERVAL) {  // non-blocking delay between sending packets
-					if (iomessage_send_command_queue.size() > 0) {  // send_command_queue only receives packets with required checksum
-						sendMessage(iomessage_send_command_queue.front());
-						iots = ionow;
-						iosendts = ionow;
-						setState(SENT_PACKET_AWAITING_CHECKSUM);
-					} else if (iomessage_send_queue.size() > 0) {
-						sendMessage(iomessage_send_queue.front());
-						iots = ionow;
-						iosendts = ionow;
-						// broadcast or variable request, no need to wait for checksum
-						iomessage_send_queue.pop();
-						setState(RECEIVED_IDLE);
+				updateState(true); // received new byte
+			} else {
+				if (getState() == RECEIVED_IDLE) {  // got time on our hands and are not waiting on something like checksum from previous sent message, check if we have something new to send.
+					if ((ionow - iosendts) > SEND_INTERVAL) {  // non-blocking delay between sending packets
+						if (iomessage_send_command_queue.size() > 0) {  // send_command_queue only receives packets with required checksum
+							sendMessage(iomessage_send_command_queue.front());
+							iots = ionow;
+							iosendts = ionow;
+							setState(SENT_PACKET_AWAITING_CHECKSUM);
+						} else if (iomessage_send_queue.size() > 0) {
+							sendMessage(iomessage_send_queue.front());
+							iots = ionow;
+							iosendts = ionow;
+							// broadcast or variable request, no need to wait for checksum
+							iomessage_send_queue.pop();
+							setState(RECEIVED_IDLE);
+						}
 					}
 				}
-			}
-			if ( (ionow - iots) > VX_REPLY_WAIT_TIME ) { updateState(); }  // no input/output during last 10ms, update state, either check for retry on send or revert back to RECEIVED_IDLE
+				if ( (ionow - iots) > VX_REPLY_WAIT_TIME ) { updateState(false); }  // no input/output during last 10ms, update state, either check for retry on send or revert back to RECEIVED_IDLE
+			} 
 			if ( (ionow - iofastqueryts) > FAST_QUERY_INTERVAL) {     // check if some of the enabled variables are not filled yet, send query again
 				retryVariables();
 			}
@@ -368,8 +370,8 @@ namespace esphome {
 			this->write_array(message, VX_MSG_LENGTH);
 		}
 
+		void ValloxVentilation::updateState(bool ionewdata) {
 
-		void ValloxVentilation::updateState() {
 			// Timeout receiving data
 			if ((ionow - iosendts) > VX_REPLY_WAIT_TIME) {
 				if (getState() == SENT_PACKET_AWAITING_CHECKSUM) {
@@ -387,70 +389,78 @@ namespace esphome {
 					setState(RECEIVED_IDLE);  // if during receive state, nothing received for 100ms, go back to IDLE and evaluate below based on fresh packet
 				}
 			}
-			switch (getState())
-			{
-				case RECEIVED_IDLE:
-					if (iomessage_recv_byte == 0x01) {
-						iomessage_recv[0] = iomessage_recv_byte;
-						addChecksum(iomessage_recv_byte);
-						setState(RECEIVED_SYSTEM_AWAITING_SENDER);
-					}
-					break;
-				case RECEIVED_SYSTEM_AWAITING_SENDER:
-					if (iomessage_recv_byte > 0x2f || iomessage_recv_byte < 0x11 || iomessage_recv_byte == 0x20) { // invalid SENDER addressess
+			if (ionewdata) {
+				switch (getState())
+				{
+					case RECEIVED_IDLE:
 						if (iomessage_recv_byte == 0x01) {
-							setState(RECEIVED_SYSTEM_AWAITING_SENDER);  // let's retry from here including the received system variable 0x01
-						} else {
-							setState(RECEIVED_IDLE); // nothing valid and not the start of new packet.. ignore and start from scratch
+							iomessage_recv[0] = iomessage_recv_byte;
+							addChecksum(iomessage_recv_byte);
+							setState(RECEIVED_SYSTEM_AWAITING_SENDER);
 						}
-					} else {
-						iomessage_recv[1] = iomessage_recv_byte;
-						addChecksum(iomessage_recv_byte);
-						setState(RECEIVED_SENDER_AWAITING_RECIPIENT);
-					}
-					break;
-				case RECEIVED_SENDER_AWAITING_RECIPIENT:
-					if (iomessage_recv_byte > 0x2f || iomessage_recv_byte < 0x10)  {
-						setState(RECEIVED_IDLE); // invalid RECIPIENT addressess
-						if (iomessage_recv_byte == 0x01) {
-							setState(RECEIVED_SYSTEM_AWAITING_SENDER);  // let's retry from here including the received system variable 0x01
+						break;
+					case RECEIVED_SYSTEM_AWAITING_SENDER:
+						if (iomessage_recv_byte > 0x2f || iomessage_recv_byte < 0x11 || iomessage_recv_byte == 0x20) { // invalid SENDER addressess
+							if (iomessage_recv_byte == 0x01) {
+								iomessage_recv[0] = iomessage_recv_byte;  // actually not needed as first byte is always 0x01 
+								setState(RECEIVED_SYSTEM_AWAITING_SENDER);  // let's retry from here including the received system variable 0x01
+								clearChecksum();
+								addChecksum(0x01);
+							} else {
+								setState(RECEIVED_IDLE); // nothing valid and not the start of new packet.. ignore and start from scratch
+							}
 						} else {
-							setState(RECEIVED_IDLE); // nothing valid and not the start of new packet.. ignore and start from scratch
+							iomessage_recv[1] = iomessage_recv_byte;
+							addChecksum(iomessage_recv_byte);
+							setState(RECEIVED_SENDER_AWAITING_RECIPIENT);
 						}
-					} else {
-						iomessage_recv[2] = iomessage_recv_byte;
+						break;
+					case RECEIVED_SENDER_AWAITING_RECIPIENT:
+						if (iomessage_recv_byte > 0x2f || iomessage_recv_byte < 0x10)  {
+							setState(RECEIVED_IDLE); // invalid RECIPIENT addressess
+							if (iomessage_recv_byte == 0x01) {
+								iomessage_recv[0] = iomessage_recv_byte; // actually not needed as first byte is always 0x01 and has already been assigned to get here
+								setState(RECEIVED_SYSTEM_AWAITING_SENDER);  // let's retry from here including the received system variable 0x01
+								clearChecksum();
+								addChecksum(0x01);
+							} else {
+								setState(RECEIVED_IDLE); // nothing valid and not the start of new packet.. ignore and start from scratch
+							}
+						} else {
+							iomessage_recv[2] = iomessage_recv_byte;
+							addChecksum(iomessage_recv_byte);
+							setState(RECEIVED_RECIPIENT_AWAITING_VARIABLE);
+						}
+						break;
+					case RECEIVED_RECIPIENT_AWAITING_VARIABLE:
+						iomessage_recv[3] = iomessage_recv_byte;
 						addChecksum(iomessage_recv_byte);
-						setState(RECEIVED_RECIPIENT_AWAITING_VARIABLE);
-					}
-					break;
-				case RECEIVED_RECIPIENT_AWAITING_VARIABLE:
-					iomessage_recv[3] = iomessage_recv_byte;
-					addChecksum(iomessage_recv_byte);
-					setState(RECEIVED_VARIABLE_AWAITING_DATA);
-					break;
-				case RECEIVED_VARIABLE_AWAITING_DATA:
-					iomessage_recv[4] = iomessage_recv_byte;
-					addChecksum(iomessage_recv_byte);
-					setState(RECEIVED_DATA_AWAITING_CHECKSUM);
-					break;
-				case RECEIVED_DATA_AWAITING_CHECKSUM:
-					if (iomessage_recv_byte == getChecksum()) { decodeMessage(iomessage_recv); }  // fall back to RECEIVED_IDLE on invalid checksum but only decode if valid
-					setState(RECEIVED_IDLE);
-					break;
-				case SENT_PACKET_AWAITING_CHECKSUM:
-					if (iomessage_send_command_queue.size() > 0) {
-						if (iomessage_recv_byte == iomessage_send_command_queue.front()[5]) {
-							iomessage_send_retries = 0;
-							if (iomessage_send_command_queue.size() > 0) { iomessage_send_command_queue.pop(); }
-							setState(RECEIVED_IDLE);    // all ok, received checksum, go back to idle
-						} // received something but not matching checksum, stay in current state and wait for 10ms to expire
-					} else {  // should not happen, just to be safe..
+						setState(RECEIVED_VARIABLE_AWAITING_DATA);
+						break;
+					case RECEIVED_VARIABLE_AWAITING_DATA:
+						iomessage_recv[4] = iomessage_recv_byte;
+						addChecksum(iomessage_recv_byte);
+						setState(RECEIVED_DATA_AWAITING_CHECKSUM);
+						break;
+					case RECEIVED_DATA_AWAITING_CHECKSUM:
+						if (iomessage_recv_byte == getChecksum()) { decodeMessage(iomessage_recv); }  // fall back to RECEIVED_IDLE on invalid checksum but only decode if valid
 						setState(RECEIVED_IDLE);
-					}
-					break;
-				default:
-					setState(RECEIVED_IDLE);
-					break;
+						break;
+					case SENT_PACKET_AWAITING_CHECKSUM:
+						if (iomessage_send_command_queue.size() > 0) {
+							if (iomessage_recv_byte == iomessage_send_command_queue.front()[5]) {
+								iomessage_send_retries = 0;
+								if (iomessage_send_command_queue.size() > 0) { iomessage_send_command_queue.pop(); }
+								setState(RECEIVED_IDLE);    // all ok, received checksum, go back to idle
+							} // received something but not matching checksum, stay in current state and wait for 10ms to expire
+						} else {  // should not happen, just to be safe..
+							setState(RECEIVED_IDLE);
+						}
+						break;
+					default:
+						setState(RECEIVED_IDLE);
+						break;
+				}
 			}
 		}
 
@@ -541,20 +551,28 @@ namespace esphome {
 			if (message[2] == VX_MSG_THIS_PANEL || message[2] == VX_MSG_PANELS) {
 				// Temperature
 				if (variable == VX_VARIABLE_T_OUTSIDE)  {
+					if ( buffer[VX_VARIABLE_T_OUTSIDE] == value ) {
+						if (this->temperature_outside_sensor_  != nullptr) { this->temperature_outside_sensor_->publish_state(convNtc2Cel(value));  }
+					} // only update on two subsequent identical values
 					buffer[VX_VARIABLE_T_OUTSIDE] = value;
-					if (this->temperature_outside_sensor_  != nullptr) { this->temperature_outside_sensor_->publish_state(convNtc2Cel(value));  }
 				} else if (variable == VX_VARIABLE_T_OUTGOING) {
+					if ( buffer[VX_VARIABLE_T_OUTGOING] == value ) {
+						if (this->temperature_outgoing_sensor_ != nullptr) { this->temperature_outgoing_sensor_->publish_state(convNtc2Cel(value)); }
+					}
 					buffer[VX_VARIABLE_T_OUTGOING] = value;
-					if (this->temperature_outgoing_sensor_ != nullptr) { this->temperature_outgoing_sensor_->publish_state(convNtc2Cel(value)); }
 				} else if (variable == VX_VARIABLE_T_INSIDE)   {
+					if ( buffer[VX_VARIABLE_T_INSIDE] == value ) {
+						if (this->temperature_inside_sensor_   != nullptr) { this->temperature_inside_sensor_->publish_state(convNtc2Cel(value));   }
+						// Inside temperature used for climate current temperature
+						this->current_temperature = convNtc2Cel(value);
+						this->publish_state();
+					}
 					buffer[VX_VARIABLE_T_INSIDE] = value;
-					if (this->temperature_inside_sensor_   != nullptr) { this->temperature_inside_sensor_->publish_state(convNtc2Cel(value));   }
-					// Inside temperature used for climate current temperature
-					this->current_temperature = convNtc2Cel(value);
-					this->publish_state();
 				} else if (variable == VX_VARIABLE_T_INCOMING) {
+					if ( buffer[VX_VARIABLE_T_INCOMING] == value ) {
+						if (this->temperature_incoming_sensor_ != nullptr) { this->temperature_incoming_sensor_->publish_state(convNtc2Cel(value)); }
+					}
 					buffer[VX_VARIABLE_T_INCOMING] = value;
-					if (this->temperature_incoming_sensor_ != nullptr) { this->temperature_incoming_sensor_->publish_state(convNtc2Cel(value)); }
 				} else if (variable == VX_VARIABLE_RH1) {  // RH 1
 					buffer[VX_VARIABLE_RH1] = value;
 					val = convHex2Rh(value);

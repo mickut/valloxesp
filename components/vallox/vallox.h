@@ -285,7 +285,7 @@ namespace esphome {
 				void sendMessage(vector<unsigned char> newmessage);
 				uint getState();
 				void setState(uint newstate);
-				void updateState();
+				void updateState(bool ionewdata);
 				void setVariable(unsigned char variable, unsigned char value, unsigned char target);
 				void decodeMessage(const unsigned char message[]);
 				void decodeFlags(unsigned char element, unsigned char program);
