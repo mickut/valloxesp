@@ -81,9 +81,8 @@ ValloxVentilationFanSpeedMinNum      = vallox_ns.class_("ValloxVentilationFanSpe
 ValloxVentilationSwitchBtn           = vallox_ns.class_("ValloxVentilationSwitchBtn",           button.Button, cg.Component)
 
 CONFIG_SCHEMA = cv.All(
-    climate.CLIMATE_SCHEMA.extend(
+    climate.climate_schema(ValloxVentilation).extend(
         {
-            cv.GenerateID(): cv.declare_id(ValloxVentilation),
             cv.Optional(CONF_FAN_SPEED): sensor.sensor_schema(
                 icon=ICON_FAN,
                 accuracy_decimals=0,
