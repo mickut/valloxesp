@@ -72,29 +72,25 @@ namespace esphome {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 
-		// sets available controls in climate control in HA
-		climate::ClimateTraits ValloxVentilation::traits() {
-			auto traits = climate::ClimateTraits();
-			traits.set_supports_action(true);
-			traits.set_supports_current_temperature(true);
-			traits.set_supports_two_point_target_temperature(false);
-			traits.set_supports_current_humidity(false);
-			traits.set_supports_target_humidity(false);
-			traits.set_visual_min_temperature(CLIMATE_MIN_TEMPERATURE);
-			traits.set_visual_max_temperature(CLIMATE_MAX_TEMPERATURE);
-			traits.set_visual_temperature_step(CLIMATE_TEMPERATURE_STEP);
-			traits.set_supported_custom_fan_modes(preset_custom_fan_modes);
-			traits.set_supported_modes(
-			{
-				climate::ClimateMode::CLIMATE_MODE_OFF,
-				climate::ClimateMode::CLIMATE_MODE_HEAT,
-				climate::ClimateMode::CLIMATE_MODE_FAN_ONLY
-			}
-			);
-			return traits;
+	// sets available controls in climate control in HA
+	climate::ClimateTraits ValloxVentilation::traits() {
+		auto traits = climate::ClimateTraits();
+		traits.set_supports_action(true);
+		traits.set_supports_current_temperature(true);
+		traits.set_supports_two_point_target_temperature(false);
+		traits.set_visual_min_temperature(CLIMATE_MIN_TEMPERATURE);
+		traits.set_visual_max_temperature(CLIMATE_MAX_TEMPERATURE);
+		traits.set_visual_temperature_step(CLIMATE_TEMPERATURE_STEP);
+		traits.set_supported_custom_fan_modes(preset_custom_fan_modes);
+		traits.set_supported_modes(
+		{
+			climate::ClimateMode::CLIMATE_MODE_OFF,
+			climate::ClimateMode::CLIMATE_MODE_HEAT,
+			climate::ClimateMode::CLIMATE_MODE_FAN_ONLY
 		}
-
-
+		);
+		return traits;
+	}
 /////////////////////////////////////////////////////////////////////////////////////////
 
 		// initial output when connecting via API
@@ -206,12 +202,13 @@ namespace esphome {
 				}
 			}
 			// Set fan speed
-			if (call.get_custom_fan_mode().has_value()) {
-				speed = std::stoi(*call.get_custom_fan_mode());
+			if (call.has_custom_fan_mode()) {
+				const char *mode = call.get_custom_fan_mode();
+				speed = atoi(mode);
 				if (speed <= VX_MAX_FAN_SPEED) {
 					hex = convFanSpeed2Hex(speed);
 					setVariable(VX_VARIABLE_FAN_SPEED, hex);
-					this->custom_fan_mode = (optional<std::string>) to_string(speed);
+					this->set_custom_fan_mode_(mode);
 					if (this->fan_speed_sensor_ != nullptr) { requestVariable(VX_VARIABLE_FAN_SPEED); } // immediately update other depending sensors
 				}
 			}
@@ -264,7 +261,8 @@ namespace esphome {
 			// 0x71 // fast but also query in case only remaining switch time is configured
 			if ((this->switch_active_binary_sensor_ != nullptr) || (this->switch_remaining_sensor_ != nullptr)) { requestVariable(VX_VARIABLE_FLAGS_06); }
 			// 0x79 // fast but only if special function is active
-			if (this->switch_remaining_sensor_ != nullptr) { 
+			if (this->switch_remaining_sensor_ != nullptr)
+			{
 				if (buffer.contains(VX_VARIABLE_FLAGS_06)) {
 					if ((buffer[VX_VARIABLE_FLAGS_06] & VX_06_FIREPLACE_FLAG_IS_ACTIVE) != 0x00 ) { requestVariable(VX_VARIABLE_SWITCH_REMAINING); }
 				}
@@ -324,7 +322,7 @@ namespace esphome {
 					}
 				}
 				if ( (ionow - iots) > VX_REPLY_WAIT_TIME ) { updateState(false); }  // no input/output during last 10ms, update state, either check for retry on send or revert back to RECEIVED_IDLE
-			} 
+			}
 			if ( (ionow - iofastqueryts) > FAST_QUERY_INTERVAL) {     // check if some of the enabled variables are not filled yet, send query again
 				retryVariables();
 			}
@@ -402,7 +400,7 @@ namespace esphome {
 					case RECEIVED_SYSTEM_AWAITING_SENDER:
 						if (iomessage_recv_byte > 0x2f || iomessage_recv_byte < 0x11 || iomessage_recv_byte == 0x20) { // invalid SENDER addressess
 							if (iomessage_recv_byte == 0x01) {
-								iomessage_recv[0] = iomessage_recv_byte;  // actually not needed as first byte is always 0x01 
+								iomessage_recv[0] = iomessage_recv_byte;	// actually not needed as first byte is always 0x01
 								setState(RECEIVED_SYSTEM_AWAITING_SENDER);  // let's retry from here including the received system variable 0x01
 								clearChecksum();
 								addChecksum(0x01);
@@ -610,7 +608,9 @@ namespace esphome {
 					val = convHex2FanSpeed(value);
 					if (val!=NOT_SET) {
 						if (this->fan_speed_sensor_ != nullptr) { this->fan_speed_sensor_->publish_state(val); }
-						this->custom_fan_mode = (optional<std::string>) to_string(val); // also set fan mode corresponding to fan speed
+						char speed_str[2];
+						snprintf(speed_str, sizeof(speed_str), "%d", val);
+						this->set_custom_fan_mode_(preset_custom_fan_modes[val-1]); // also set fan mode corresponding to fan speed
 						this->publish_state();
 					}
 				} else if (variable == VX_VARIABLE_FAN_SPEED_MIN) {
