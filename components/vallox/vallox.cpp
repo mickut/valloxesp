@@ -75,20 +75,16 @@ namespace esphome {
 	// sets available controls in climate control in HA
 	climate::ClimateTraits ValloxVentilation::traits() {
 		auto traits = climate::ClimateTraits();
-		traits.set_supports_action(true);
-		traits.set_supports_current_temperature(true);
-		traits.set_supports_two_point_target_temperature(false);
+		traits.add_supported_mode(climate::ClimateMode::CLIMATE_MODE_OFF);
+		traits.add_supported_mode(climate::ClimateMode::CLIMATE_MODE_HEAT);
+		traits.add_supported_mode(climate::ClimateMode::CLIMATE_MODE_FAN_ONLY);
+		traits.set_supported_custom_fan_modes(preset_custom_fan_modes);
 		traits.set_visual_min_temperature(CLIMATE_MIN_TEMPERATURE);
 		traits.set_visual_max_temperature(CLIMATE_MAX_TEMPERATURE);
 		traits.set_visual_temperature_step(CLIMATE_TEMPERATURE_STEP);
-		traits.set_supported_custom_fan_modes(preset_custom_fan_modes);
-		traits.set_supported_modes(
-		{
-			climate::ClimateMode::CLIMATE_MODE_OFF,
-			climate::ClimateMode::CLIMATE_MODE_HEAT,
-			climate::ClimateMode::CLIMATE_MODE_FAN_ONLY
-		}
-		);
+		traits.add_feature_flags(
+			climate::CLIMATE_SUPPORTS_ACTION |
+			climate::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE);
 		return traits;
 	}
 /////////////////////////////////////////////////////////////////////////////////////////
