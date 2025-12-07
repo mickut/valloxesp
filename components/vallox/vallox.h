@@ -96,7 +96,7 @@ const int8_t vxTemps[] = {
 
 
 // default names of fan modes (1-8)
-const std::set< std::string > preset_custom_fan_modes = {"1", "2", "3", "4", "5", "6", "7", "8"};
+static constexpr const char *const FAN_MODES[] = {"1", "2", "3", "4", "5", "6", "7", "8"};
 
 
 #define RECEIVED_IDLE                        0x00

@@ -75,15 +75,12 @@ namespace esphome {
 		// sets available controls in climate control in HA
 		climate::ClimateTraits ValloxVentilation::traits() {
 			auto traits = climate::ClimateTraits();
-			traits.set_supports_action(true);
-			traits.set_supports_current_temperature(true);
-			traits.set_supports_two_point_target_temperature(false);
-			traits.set_supports_current_humidity(false);
-			traits.set_supports_target_humidity(false);
+			traits.add_feature_flags(esphome::climate::CLIMATE_SUPPORTS_ACTION);
+			traits.add_feature_flags(esphome::climate::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE);
 			traits.set_visual_min_temperature(CLIMATE_MIN_TEMPERATURE);
 			traits.set_visual_max_temperature(CLIMATE_MAX_TEMPERATURE);
 			traits.set_visual_temperature_step(CLIMATE_TEMPERATURE_STEP);
-			traits.set_supported_custom_fan_modes(preset_custom_fan_modes);
+			traits.set_supported_custom_fan_modes(FAN_MODES);
 			traits.set_supported_modes(
 			{
 				climate::ClimateMode::CLIMATE_MODE_OFF,
@@ -206,12 +203,12 @@ namespace esphome {
 				}
 			}
 			// Set fan speed
-			if (call.get_custom_fan_mode().has_value()) {
-				speed = std::stoi(*call.get_custom_fan_mode());
+			if (call.has_custom_fan_mode()) {
+				speed = std::stoi(call.get_custom_fan_mode());
 				if (speed <= VX_MAX_FAN_SPEED) {
 					hex = convFanSpeed2Hex(speed);
 					setVariable(VX_VARIABLE_FAN_SPEED, hex);
-					this->custom_fan_mode = (optional<std::string>) to_string(speed);
+					this->set_custom_fan_mode_(to_string(speed).c_str());
 					if (this->fan_speed_sensor_ != nullptr) { requestVariable(VX_VARIABLE_FAN_SPEED); } // immediately update other depending sensors
 				}
 			}
@@ -610,7 +607,7 @@ namespace esphome {
 					val = convHex2FanSpeed(value);
 					if (val!=NOT_SET) {
 						if (this->fan_speed_sensor_ != nullptr) { this->fan_speed_sensor_->publish_state(val); }
-						this->custom_fan_mode = (optional<std::string>) to_string(val); // also set fan mode corresponding to fan speed
+						this->set_custom_fan_mode_(to_string(val).c_str());  // also set fan mode corresponding to fan speed
 						this->publish_state();
 					}
 				} else if (variable == VX_VARIABLE_FAN_SPEED_MIN) {
