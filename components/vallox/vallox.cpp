@@ -199,7 +199,7 @@ namespace esphome {
 			}
 			// Set fan speed
 			if (call.has_custom_fan_mode()) {
-				const char *mode = call.get_custom_fan_mode();
+				const char *mode = call.get_custom_fan_mode().c_str();
 				speed = atoi(mode);
 				if (speed <= VX_MAX_FAN_SPEED) {
 					hex = convFanSpeed2Hex(speed);
