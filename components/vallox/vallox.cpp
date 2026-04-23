@@ -80,7 +80,6 @@ namespace esphome {
 			traits.set_visual_min_temperature(CLIMATE_MIN_TEMPERATURE);
 			traits.set_visual_max_temperature(CLIMATE_MAX_TEMPERATURE);
 			traits.set_visual_temperature_step(CLIMATE_TEMPERATURE_STEP);
-			traits.set_supported_custom_fan_modes(FAN_MODES);
 			traits.set_supported_modes(
 			{
 				climate::ClimateMode::CLIMATE_MODE_OFF,
@@ -219,6 +218,7 @@ namespace esphome {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 		void ValloxVentilation::setup() {
+            this->set_supported_custom_fan_modes(FAN_MODES);
 			retryVariables();
 		}
 
