@@ -78,7 +78,6 @@ namespace esphome {
 		traits.add_supported_mode(climate::ClimateMode::CLIMATE_MODE_OFF);
 		traits.add_supported_mode(climate::ClimateMode::CLIMATE_MODE_HEAT);
 		traits.add_supported_mode(climate::ClimateMode::CLIMATE_MODE_FAN_ONLY);
-		traits.set_supported_custom_fan_modes(preset_custom_fan_modes);
 		traits.set_visual_min_temperature(CLIMATE_MIN_TEMPERATURE);
 		traits.set_visual_max_temperature(CLIMATE_MAX_TEMPERATURE);
 		traits.set_visual_temperature_step(CLIMATE_TEMPERATURE_STEP);
@@ -199,12 +198,11 @@ namespace esphome {
 			}
 			// Set fan speed
 			if (call.has_custom_fan_mode()) {
-				const char *mode = call.get_custom_fan_mode().c_str();
-				speed = atoi(mode);
+				speed = std::stoi(call.get_custom_fan_mode());
 				if (speed <= VX_MAX_FAN_SPEED) {
 					hex = convFanSpeed2Hex(speed);
 					setVariable(VX_VARIABLE_FAN_SPEED, hex);
-					this->set_custom_fan_mode_(mode);
+					this->set_custom_fan_mode_(to_string(speed).c_str());
 					if (this->fan_speed_sensor_ != nullptr) { requestVariable(VX_VARIABLE_FAN_SPEED); } // immediately update other depending sensors
 				}
 			}
@@ -215,6 +213,7 @@ namespace esphome {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 		void ValloxVentilation::setup() {
+            this->set_supported_custom_fan_modes(FAN_MODES);
 			retryVariables();
 		}
 
@@ -604,9 +603,7 @@ namespace esphome {
 					val = convHex2FanSpeed(value);
 					if (val!=NOT_SET) {
 						if (this->fan_speed_sensor_ != nullptr) { this->fan_speed_sensor_->publish_state(val); }
-						char speed_str[2];
-						snprintf(speed_str, sizeof(speed_str), "%d", val);
-						this->set_custom_fan_mode_(preset_custom_fan_modes[val-1]); // also set fan mode corresponding to fan speed
+						this->set_custom_fan_mode_(to_string(val).c_str());  // also set fan mode corresponding to fan speed
 						this->publish_state();
 					}
 				} else if (variable == VX_VARIABLE_FAN_SPEED_MIN) {
